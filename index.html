@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MikroLicznik Pro</title>
+    <style>
+        :root { --p: #007bff; --s: #28a745; --d: #dc3545; --dark: #212529; }
+        body { font-family: -apple-system, sans-serif; background: #f8f9fa; margin: 0; padding: 15px; color: var(--dark); }
+        .card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); max-width: 500px; margin: auto; }
+        h2 { text-align: center; margin-top: 0; font-size: 1.2rem; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; background: #fdfdfd; }
+        .grid-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        button { width: 100%; padding: 14px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .btn-add { background: var(--p); color: white; margin-top: 10px; }
+        .summary { margin-top: 20px; background: var(--dark); color: white; padding: 15px; border-radius: 12px; text-align: center; }
+        .kcal-big { font-size: 28px; font-weight: bold; color: #ffc107; display: block; }
+        .history-section { margin-top: 30px; border-top: 2px dashed #eee; padding-top: 15px; }
+        .history-item { font-size: 12px; background: #eee; padding: 8px; margin-bottom: 5px; border-radius: 6px; display: flex; justify-content: space-between; }
+        table { width: 100%; margin-top: 15px; border-collapse: collapse; font-size: 13px; }
+        td { padding: 8px; border-bottom: 1px solid #f0f0f0; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2 id="current-date">Dziennik</h2>
+    
+    <input type="text" id="name" placeholder="Nazwa produktu/posiłku">
+    <div class="grid-inputs">
+        <input type="number" id="p" placeholder="B">
+        <input type="number" id="f" placeholder="T">
+        <input type="number" id="c" placeholder="W">
+    </div>
+    <button class="btn-add" onclick="addItem()">DODAJ POSIŁEK</button>
+
+    <div class="summary">
+        <span class="kcal-big" id="totalKcal">0 kcal</span>
+        B: <span id="totalP">0</span>g | T: <span id="totalF">0</span>g | W: <span id="totalC">0</span>g
+    </div>
+
+    <table id="table">
+        <tbody id="list"></tbody>
+    </table>
+
+    <div class="history-section">
+        <h3>Historia (poprzednie dni)</h3>
+        <div id="history-list"></div>
+    </div>
+</div>
+
+<script>
+    // Funkcja generująca klucz dnia (reset o 3 rano)
+    function getDayKey() {
+        const now = new Date();
+        const hour = now.getHours();
+        // Jeśli jest przed 3:00, traktuj jako poprzedni dzień
+        if (hour < 3) {
+            now.setDate(now.getDate() - 1);
+        }
+        return now.toISOString().split('T')[0];
+    }
+
+    let history = JSON.parse(localStorage.getItem('macroHistory')) || {};
+    let todayKey = getDayKey();
+    
+    document.getElementById('current-date').innerText = "Dzień: " + todayKey;
+
+    function addItem() {
+        const name = document.getElementById('name').value || "Produkt";
+        const p = parseFloat(document.getElementById('p').value) || 0;
+        const f = parseFloat(document.getElementById('f').value) || 0;
+        const c = parseFloat(document.getElementById('c').value) || 0;
+
+        // Jeśli ten dzień nie istnieje w historii, stwórz go
+        if (!history[todayKey]) history[todayKey] = [];
+        
+        history[todayKey].push({ name, p, f, c });
+        save();
+    }
+
+    function save() {
+        localStorage.setItem('macroHistory', JSON.stringify(history));
+        render();
+    }
+
+    function render() {
+        const list = document.getElementById('list');
+        const histDiv = document.getElementById('history-list');
+        list.innerHTML = "";
+        histDiv.innerHTML = "";
+
+        let tP = 0, tF = 0, tC = 0;
+
+        // Renderowanie dzisiejszych posiłków
+        if (history[todayKey]) {
+            history[todayKey].forEach(m => {
+                tP += m.p; tF += m.f; tC += m.c;
+                list.innerHTML += `<tr><td>${m.name}</td><td>${m.p}B</td><td>${m.f}T</td><td>${m.c}W</td></tr>`;
+            });
+        }
+
+        const totalKcal = (tP * 4) + (tC * 4) + (tF * 9);
+        document.getElementById('totalKcal').innerText = `${totalKcal.toFixed(0)} kcal`;
+        document.getElementById('totalP').innerText = tP.toFixed(1);
+        document.getElementById('totalF').innerText = tF.toFixed(1);
+        document.getElementById('totalC').innerText = tC.toFixed(1);
+
+        // Renderowanie historii (wszystkie dni oprócz dzisiejszego)
+        Object.keys(history).sort().reverse().forEach(date => {
+            if (date === todayKey) return;
+            let dP = 0, dF = 0, dC = 0;
+            history[date].forEach(m => { dP += m.p; dF += m.f; dC += m.c; });
+            let dKcal = (dP * 4) + (dC * 4) + (dF * 9);
+            histDiv.innerHTML += `<div class="history-item"><span>${date}</span> <b>${dKcal.toFixed(0)} kcal</b></div>`;
+        });
+    }
+
+    render();
+</script>
+
+</body>
+</html>
